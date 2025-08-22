@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NECTA Academic System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body { background-color: #f3f4f6; font-family: Arial, sans-serif; }
+input, select, button { margin: 2px 0; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid black; padding: 4px; text-align: center; }
+</style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+<!-- Login Page -->
+<div id="loginPage" class="w-full max-w-sm bg-white p-6 rounded-2xl shadow">
+  <h2 class="text-2xl font-bold mb-4 text-center">Login</h2>
+  <input id="username" type="text" placeholder="Username" class="w-full mb-2 p-2 border rounded">
+  <input id="password" type="password" placeholder="Password" class="w-full mb-4 p-2 border rounded">
+  <button onclick="login()" class="w-full bg-blue-600 text-white py-2 rounded">Login</button>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" class="hidden w-full max-w-4xl bg-white p-6 rounded-2xl shadow">
+  <div class="flex justify-between items-center mb-4">
+    <h2 class="text-xl font-bold">📚 NECTA Academic System</h2>
+    <div class="flex items-center gap-4">
+      <span id="roleDisplay" class="text-gray-600"></span>
+      <button onclick="logout()" class="bg-red-500 text-white px-3 py-1 rounded">Logout</button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 gap-4">
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="hidden col-span-3">
+      <div class="bg-white shadow rounded-2xl p-4 mb-4">
+        <h3 class="text-lg font-bold mb-2">👥 Manage Users</h3>
+        <input id="newUser" type="text" placeholder="Username" class="border p-2 rounded w-1/3">
+        <input id="newPass" type="text" placeholder="Password" class="border p-2 rounded w-1/3">
+        <select id="newRole" class="border p-2 rounded w-1/3">
+          <option>Student</option>
+          <option>Teacher</option>
+          <option>Admin</option>
+        </select>
+        <button onclick="addUser()" class="bg-green-500 text-white px-3 py-1 rounded">Add User</button>
+        <ul id="userList" class="mt-2"></ul>
+      </div>
+
+      <div class="bg-white shadow rounded-2xl p-4">
+        <h3 class="text-lg font-bold mb-2">📖 Manage Courses</h3>
+        <input id="newCourse" type="text" placeholder="Course name" class="border p-2 rounded">
+        <button onclick="addCourse()" class="bg-green-500 text-white px-3 py-1 rounded">Add Course</button>
+        <ul id="courseList" class="mt-2"></ul>
+      </div>
+    </div>
+
+    <!-- Teacher Panel -->
+    <div id="teacherPanel" class="hidden col-span-3">
+      <div class="bg-white shadow rounded-2xl p-4">
+        <h3 class="text-lg font-bold mb-2">✏️ Enter Marks</h3>
+        <div class="flex gap-2 mb-4">
+          <input id="studentName" type="text" placeholder="Student Username" class="border p-2 rounded flex-grow">
+          <input id="courseName" type="text" placeholder="Course" class="border p-2 rounded flex-grow">
+          <input id="courseMark" type="number" placeholder="Marks (0-100)" class="border p-2 rounded flex-grow">
+          <button onclick="addMark()" class="bg-green-500 text-white px-3 py-1 rounded">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Grades -->
+    <div class="bg-white shadow rounded-2xl p-4 studentOnly hidden col-span-3">
+      <h3 class="text-lg font-bold mb-2">🎓 My Results</h3>
+      <table id="gradesTable" class="w-full border"></table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let users = [
+  { username: "shadrack", password: "12345", role: "Student" },
+  { username: "jane", password: "teacher123", role: "Teacher" },
+  { username: "admin", password: "admin123", role: "Admin" }
+];
+
+let courses = ["Mathematics","Physics","Chemistry","Biology","English","Geography","History"];
+let grades = { shadrack: { Mathematics: 85, Physics: 72 } };
+let currentUser = null;
+
+function getGradeAndPoints(mark){
+  let grade = '', points = 0; mark=Number(mark);
+  if(mark>=80){ grade='A'; points=5; }
+  else if(mark>=75){ grade='A-'; points=4.5; }
+  else if(mark>=70){ grade='B+'; points=4; }
+  else if(mark>=65){ grade='B'; points=3.5; }
+  else if(mark>=60){ grade='B-'; points=3; }
+  else if(mark>=55){ grade='C+'; points=2.5; }
+  else if(mark>=50){ grade='C'; points=2; }
+  else if(mark>=45){ grade='C-'; points=1.5; }
+  else if(mark>=40){ grade='D'; points=1; }
+  else{ grade='F'; points=0; }
+  return {grade, points};
+}
+
+function calculateDivision(student){
+  if(!grades[student]) return {avg:0, division:'N/A'};
+  let totalPoints=0, subjects=0;
+  for(let c in grades[student]){
+    const {points}=getGradeAndPoints(grades[student][c]);
+    totalPoints+=points; subjects++;
+  }
+  const avg=subjects?(totalPoints/subjects).toFixed(2):0;
+  let division='';
+  if(avg>=32/7) division='I';
+  else if(avg>=24/7) division='II';
+  else if(avg>=16/7) division='III';
+  else if(avg>=8/7) division='IV';
+  else division='Fail';
+  return {avg, division};
+}
+
+function renderGrades(student){
+  const table=document.getElementById('gradesTable');
+  table.innerHTML=`<tr>
+    <th class="border px-2">Course</th>
+    <th class="border px-2">Marks</th>
+    <th class="border px-2">Grade</th>
+    <th class="border px-2">Points</th>
+  </tr>`;
+  let totalPoints=0, subjects=0;
+  for(let c in grades[student]){
+    const mark=grades[student][c];
+    const {grade, points}=getGradeAndPoints(mark);
+    totalPoints+=points; subjects++;
+    table.innerHTML+=`<tr>
+      <td class="border px-2">${c}</td>
+      <td class="border px-2">${mark}</td>
+      <td class="border px-2">${grade}</td>
+      <td class="border px-2">${points}</td>
+    </tr>`;
+  }
+  const avg=subjects?(totalPoints/subjects).toFixed(2):0;
+  const div=calculateDivision(student).division;
+  table.innerHTML+=`<tr>
+    <td class="border px-2 font-bold" colspan="3">Average Points</td>
+    <td class="border px-2 font-bold">${avg}</td>
+  </tr>
+  <tr>
+    <td class="border px-2 font-bold" colspan="3">Division</td>
+    <td class="border px-2 font-bold">${div}</td>
+  </tr>`;
+}
+
+function login(){
+  const u=document.getElementById('username').value.trim();
+  const p=document.getElementById('password').value.trim();
+  const found=users.find(x=>x.username===u && x.password===p);
+  if(!found){ alert("❌ Invalid username or password!"); return; }
+  currentUser=found;
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  document.getElementById('roleDisplay').innerText=`${found.username} (${found.role})`;
+  document.getElementById('adminPanel').classList.add('hidden');
+  document.getElementById('teacherPanel').classList.add('hidden');
+  document.querySelectorAll('.studentOnly').forEach(el=>el.classList.add('hidden'));
+  if(found.role==='Admin') document.getElementById('adminPanel').classList.remove('hidden');
+  if(found.role==='Teacher') document.getElementById('teacherPanel').classList.remove('hidden');
+  if(found.role==='Student'){ 
+    document.querySelectorAll('.studentOnly').forEach(el=>el.classList.remove('hidden'));
+    renderGrades(found.username);
+  }
+  renderUsers(); renderCourses();
+}
+
+function logout(){ currentUser=null;
+  document.getElementById('loginPage').classList.remove('hidden');
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('username').value=""; document.getElementById('password').value="";
+}
+
+function addUser(){
+  const username=document.getElementById('newUser').value.trim();
+  const password=document.getElementById('newPass').value.trim();
+  const role=document.getElementById('newRole').value;
+  if(!username || !password){ alert("❌ Enter username and password"); return; }
+  if(users.find(u=>u.username===username)){ alert("❌ Username exists"); return; }
+  users.push({username, password, role}); renderUsers();
+  document.getElementById('newUser').value=""; document.getElementById('newPass').value="";
+  alert("✅ User created!");
+}
+
+function renderUsers(){
+  const ul=document.getElementById('userList'); if(!ul) return; ul.innerHTML="";
+  users.forEach(u=>{ ul.innerHTML+=`<li>${u.username} (${u.role})</li>`; });
+}
+
+function addCourse(){
+  const c=document.getElementById('newCourse').value.trim();
+  if(c){ courses.push(c); renderCourses(); document.getElementById('newCourse').value=""; }
+}
+
+function renderCourses(){
+  const cl=document.getElementById('courseList'); if(!cl) return; cl.innerHTML="";
+  courses.forEach(c=>{ cl.innerHTML+=`<li>${c}</li>`; });
+}
+
+function addMark(){
+  const student=document.getElementById('studentName').value.trim();
+  const course=document.getElementById('courseName').value.trim();
+  const mark=document.getElementById('courseMark').value.trim();
+  if(!student || !course || mark===""){ alert("❌ Fill all fields"); return; }
+  if(!grades[student]) grades[student]={};
+  grades[student][course]=Number(mark);
+  alert(`✅ Marks saved for ${student} in ${course}`);
+  document.getElementById('courseMark').value="";
+}
+</script>
+</body>
+</html>
